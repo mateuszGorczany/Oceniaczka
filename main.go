@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/microsoft/ApplicationInsights-Go/appinsights"
 )
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -17,6 +19,12 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if false {
+		client := appinsights.NewTelemetryClient(os.Getenv("APPINSIGHTS_INSTRUMENTATIONKEY"))
+		request := appinsights.NewRequestTelemetry("GET", "https://myapp.azurewebsites.net/", 1, "Success")
+		client.Track(request)
+	}
+
 	listenAddr := ":8080"
 	if val, ok := os.LookupEnv("FUNCTIONS_CUSTOMHANDLER_PORT"); ok {
 		listenAddr = ":" + val
