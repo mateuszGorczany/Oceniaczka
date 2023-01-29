@@ -3,8 +3,17 @@ trigger:
 
 pool:
    vmImage: 'ubuntu-latest'
+variables:
+  GO_CACHE_DIR: $(Pipeline.Workspace)/.cache/go-build/
 
-steps: 
+steps:
+- task: Cache@2
+  inputs:
+    key: 'go | "$(Agent.OS)" | go.mod'
+    restoreKeys: | 
+      go | "$(Agent.OS)"
+    path: $(GO_CACHE_DIR)
+  displayName: Cache GO packages 
 - task: GoTool@0
   inputs:
     version: '1.19'
@@ -29,7 +38,7 @@ steps:
 - task: Go@0
   inputs:
     command: 'build'
-    arguments: './build'
+    arguments: '-o ./build'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Build executable'
 
