@@ -7,13 +7,6 @@ variables:
   GO_CACHE_DIR: $(Pipeline.Workspace)/.cache/go-build/
 
 steps:
-- task: Cache@2
-  inputs:
-    key: 'go | "$(Agent.OS)" | go.mod'
-    restoreKeys: | 
-      go | "$(Agent.OS)"
-    path: $(GO_CACHE_DIR)
-  displayName: Cache GO packages 
 - task: GoTool@0
   inputs:
     version: '1.19'
