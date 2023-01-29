@@ -21,6 +21,10 @@ steps:
     arguments: '-v'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Run tests'
+- task: CmdLine@2
+  inputs:
+    script: 'mkdir build'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
 
 - task: Go@0
   inputs:
