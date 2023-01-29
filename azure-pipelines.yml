@@ -5,26 +5,37 @@ pool:
    vmImage: 'ubuntu-latest'
 
 steps: 
-- task: Download Go@0
+- task: GoTool@0
   inputs:
     version: '1.19'
-- task: Download dependencies@0
+  displayName: 'Download Go'
+- task: Go@0
   inputs:
     command: 'get'
     arguments: '-d'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
-- task: Run tests@0
+  displayName: 'Download dependencies'
+- task: Go@0
   inputs:
     command: 'test'
     arguments: '-v'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
-- task: Build executable@0
+  displayName: 'Run tests'
+
+- task: Go@0
   inputs:
-    command: 'build ./build'
+    command: 'build'
+    arguments: './build'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
-- task: Copy executable@2
+  displayName: 'Build executable'
+
+- task: CopyFiles@2
   inputs:
-    TargetFolder: '$(Build.ArtifactStagingDirectory)/build'
+    SourceFolder:  '$(System.DefaultWorkingDirectory)/build'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+  displayName: 'Copy artifacts'
+
 - task: PublishBuildArtifacts@1
   inputs:
-     artifactName: drop
+     artifactName: oceniaczka
+  displayName: 'Publish artifacts'
