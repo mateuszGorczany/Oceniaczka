@@ -4,7 +4,7 @@ trigger:
 pool:
    vmImage: 'ubuntu-latest'
 variables:
-  GO_CACHE_DIR: '$(System.DefaultWorkingDirectory)/vendor'
+  GO_CACHE_DIR: $(Pipeline.Workspace)/.cache/go-build/
 
 steps:
 - task: Cache@2
@@ -20,8 +20,8 @@ steps:
   displayName: 'Download Go'
 - task: Go@0
   inputs:
-    command: 'custom'
-    customCommand: 'mod vendor'
+    command: 'get'
+    arguments: '-d'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Download dependencies'
 - task: Go@0
