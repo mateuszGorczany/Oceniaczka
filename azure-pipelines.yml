@@ -37,7 +37,7 @@ steps:
 
 - task: CopyFiles@2
   inputs:
-    SourceFolder:  '$(System.DefaultWorkingDirectory)/build'
+    SourceFolder:  '$(System.DefaultWorkingDirectory)'
     TargetFolder: '$(Build.ArtifactStagingDirectory)'
   displayName: 'Copy artifacts'
 
