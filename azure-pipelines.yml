@@ -2,7 +2,7 @@ trigger:
  - main
 
 pool:
-   vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'
 variables:
   GO_CACHE_DIR: $(Pipeline.Workspace)/.cache/go-build/
 
