@@ -12,7 +12,7 @@ steps:
     key: 'go | "$(Agent.OS)" | go.mod'
     restoreKeys: | 
       go | "$(Agent.OS)"
-    path: $(GO_CACHE_DIR)
+    path: '$(System.DefaultWorkingDirectory)/vendor'
   displayName: Cache GO packages 
 - task: GoTool@0
   inputs:
@@ -20,8 +20,8 @@ steps:
   displayName: 'Download Go'
 - task: Go@0
   inputs:
-    command: 'get'
-    arguments: '-d'
+    command: 'custom'
+    arguments: 'mod vendor'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
   displayName: 'Download dependencies'
 - task: Go@0
