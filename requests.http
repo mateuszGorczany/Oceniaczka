@@ -1,1 +1,3 @@
 GET http://localhost:7071/api/HttpTrigger1
+
+GET https://login.microsoftonline.com/consumers/v2.0/
