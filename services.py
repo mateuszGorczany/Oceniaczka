@@ -7,17 +7,26 @@ from flask import session
 from auth import _get_token_from_cache
 import app_config
 import requests
-from azure.cosmos import CosmosClient
 from pydantic import parse_obj_as
+from abc import ABC, abstractmethod
+
+class QueryExecutor(ABC):
+
+    @abstractmethod
+    def query_items(
+        self,
+        query,  # type: str
+        parameters=None,  # type: Optional[List[Dict[str, object]]]
+        partition_key=None,  # type: Optional[Any]
+        enable_cross_partition_query=None,  # type: Optional[bool]
+        max_item_count=None,  # type: Optional[int]
+        enable_scan_in_query=None,  # type: Optional[bool]
+        populate_query_metrics=None,  # type: Optional[bool]
+        **kwargs  # type: Any
+    ):
+        pass
 
 # %%
-def db_client():
-    client = CosmosClient(app_config.DB_ACCOUNT_URI, app_config.DB_ACCOUNT_KEY)
-    database = client.get_database_client(app_config.DB_NAME)
-    container = database.get_container_client("Applicants")
-    return container
-
-client = db_client()
 
 # %%
 
@@ -73,20 +82,18 @@ class UserSerivce:
 
 class ApplicantsService:
     
-    def __init__(self) -> None:
-        pass
+    def __init__(self, db_client: QueryExecutor) -> None:
+        self.db_client: QueryExecutor = db_client
 
-    @staticmethod
-    def list_applicants() -> List[Applicant]:
-        applicants_raw = client.query_items(
+    def list_applicants(self) -> List[Applicant]:
+        applicants_raw = self.db_client.query_items(
             query="SELECT c.id, c.name, c.surname, c.age, c.faculty FROM c",
             enable_cross_partition_query=True
         )
         return parse_obj_as(List[Applicant], list(applicants_raw))
 
-    @staticmethod
-    def get_applicant_by_id(uuid: UUID) -> Optional[Applicant]:
-        applicant_raw = list(client.query_items(
+    def get_applicant_by_id(self, uuid: UUID) -> Optional[Applicant]:
+        applicant_raw = list(self.db_client.query_items(
             query=f"SELECT c.id, c.name, c.surname, c.age, c.faculty from c where c.id = '{uuid}'",
             enable_cross_partition_query=True
         ))

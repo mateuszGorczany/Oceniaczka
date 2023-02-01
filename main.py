@@ -13,17 +13,23 @@ from logging import StreamHandler
 from opencensus.ext.azure.log_exporter import AzureLogHandler
 import app_config
 import multiprocessing_logging
+from azure.cosmos import CosmosClient
 
 multiprocessing_logging.install_mp_handler()
 
-
+def db_client():
+    client = CosmosClient(app_config.DB_ACCOUNT_URI, app_config.DB_ACCOUNT_KEY)
+    database = client.get_database_client(app_config.DB_NAME)
+    container = database.get_container_client("Applicants")
+    return container
 
 class Services:
 
     def __init__(self) -> None:
+        self.db_client = db_client()
         self.user_service = svcs.UserSerivce()
         self.voting_service = svcs.VotingService()
-        self.applicants_service = svcs.ApplicantsService()
+        self.applicants_service = svcs.ApplicantsService(db_client)
 
 def set_up_app():
     app = Flask(__name__)
@@ -64,15 +70,8 @@ def index():
 
 @app.route("/login")
 def login():
-    # Technically we could use empty list [] as scopes to do just sign in,
-    # here we choose to also collect end user consent upfront
-    # logger.info("logging in")
     session["flow"] = _build_auth_code_flow(scopes=app_config.SCOPE)
     services.user_service.load_current_user()
-    # services.user_service.load_current_user()
-    # return render_template(
-    #     "login.html", auth_url=session["flow"]["auth_uri"], version=msal.__version__
-    # )
     return redirect(session["flow"]["auth_uri"])
 
 
