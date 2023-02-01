@@ -1,0 +1,23 @@
+{% if applicants|length>0 %}
+{% for applicant in applicants %}
+<tr>
+    <td scope="row"> {{ loop.index }} </td>
+    <td> {{ applicant.Name }} </td>
+    <td> {{ applicant.Surname }} </td>
+    <td> {{ applicant.Faculty }} </td>
+    <td> {{ applicant.Age }} </td>
+    {% if session.get("user") %}
+    <td>
+        <!-- <form action="/vote" method="post" id="voting"> -->
+        <form  id="voting">
+            <input type="radio" id="yes" name="vote-{{ loop.index }}" value="yes">Tak</input>
+            <input type="radio" id="no" name="vote-{{ loop.index }}" value="no">Nie</input>
+            <input type="button" onclick="submitVote('{{ applicant.ID }}', 'vote-{{ loop.index }}'); return false" value="Zagłosuj"></input>
+        </form>
+        <!-- <button type="submit" form="voting">Zagłosuj</button> -->
+        <!-- <a href="vote/{applicant.GUID}">Zagłosuj na TAK</a> -->
+    </td>
+    {% endif %}
+</tr>
+{% endfor %}
+{% endif %}

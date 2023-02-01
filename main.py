@@ -1,199 +1,136 @@
-# Opencensus imports
+from flask import Flask, render_template, session, request, redirect, url_for, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_session import Session  # https://pythonhosted.org/Flask-Session
 from opencensus.ext.azure.trace_exporter import AzureExporter
+from opencensus.ext.flask.flask_middleware import FlaskMiddleware
 from opencensus.trace.samplers import ProbabilitySampler
-from opencensus.trace.tracer import Tracer
-from opencensus.trace.span import SpanKind
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi_azure_auth import SingleTenantAzureAuthorizationCodeBearer
-from fastapi import Security
+from auth import _load_cache, _get_token_from_cache, \
+      _build_auth_code_flow,_build_msal_app, _save_cache
+import msal
+import requests
+import services as svcs
+from logging import StreamHandler
+from opencensus.ext.azure.log_exporter import AzureLogHandler
+import app_config
+import multiprocessing_logging
 
-# FastAPI imports
-from fastapi import Header
+multiprocessing_logging.install_mp_handler()
 
-# uvicorn
-from typing import Optional, Dict
 
-import uvicorn
-from fastapi import FastAPI, Request
-from config.config import settings, templates
-from auth import router as auth_router
-from fastapi.security import OAuth2
-from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
-from starlette.status import HTTP_401_UNAUTHORIZED
-from fastapi.exceptions import HTTPException
 
-app = FastAPI(
-    swagger_ui_oauth2_redirect_url="/get_auth_token",
-    swagger_ui_init_oauth={
-        "usePkceWithAuthorizationCodeGrant": True,
-        "clientId": settings.OPENAPI_CLIENT_ID,
-    },
+class Services:
+
+    def __init__(self) -> None:
+        self.user_service = svcs.UserSerivce()
+        self.voting_service = svcs.VotingService()
+        self.applicants_service = svcs.ApplicantsService()
+
+def set_up_app():
+    app = Flask(__name__)
+    app.config.from_object(app_config)
+    Session(app)
+    middleware = FlaskMiddleware(
+        app,
+        exporter=AzureExporter(connection_string=app_config.APPLICATIONINSIGHTS_CONNECTION_STRING),
+        sampler=ProbabilitySampler(rate=1.0),
+    )
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    return app, middleware
+
+
+app, middleware = set_up_app()
+handler = AzureLogHandler(
+    connection_string=app_config.APPLICATIONINSIGHTS_CONNECTION_STRING,
 )
-app.include_router(auth_router)
-# app.mount("/static", StaticFiles(directory="./static"), name="static")
-# app.include_router(auth.router)
+streamHandler = StreamHandler(handler)
+app.logger.addHandler(streamHandler)
+# app.logger.addHandler(handler)
+services = Services()
 
-scopes = {
-    f"api://{settings.CLIENT_ID}/user_impersonation": "user_impersonation",
-}
+@app.route("/")
+def index():
+    # if not session.get("user"):
+    # if not services.user_service.is_user_logged_in():
+    #     return redirect(url_for("login"))
+    services.user_service.load_current_user()
+    user = services.user_service.current_user
+    return render_template(
+        "index.html", 
+        user=user, 
+        applicants=services.applicants_service.list_applicants(),
+        version=msal.__version__
+    )
 
 
-azure_scheme = SingleTenantAzureAuthorizationCodeBearer(
-    app_client_id=settings.CLIENT_ID,
-    tenant_id=settings.TENANT_ID,
-    scopes=scopes,
-    token_version=1,
-)
+@app.route("/login")
+def login():
+    # Technically we could use empty list [] as scopes to do just sign in,
+    # here we choose to also collect end user consent upfront
+    # logger.info("logging in")
+    session["flow"] = _build_auth_code_flow(scopes=app_config.SCOPE)
+    services.user_service.load_current_user()
+    # services.user_service.load_current_user()
+    # return render_template(
+    #     "login.html", auth_url=session["flow"]["auth_uri"], version=msal.__version__
+    # )
+    return redirect(session["flow"]["auth_uri"])
 
 
-class CookieBasedOAuth2TokenBearer(OAuth2):
-    def __init__(
-        self,
-        authorizationUrl: str,
-        tokenUrl: str,
-        refreshUrl: Optional[str] = None,
-        scheme_name: Optional[str] = None,
-        scopes: Optional[Dict[str, str]] = None,
-        description: Optional[str] = None,
-        auto_error: bool = True,
-    ):
-        if not scopes:
-            scopes = {}
-        flows = OAuthFlowsModel(
-            authorizationCode={
-                "authorizationUrl": authorizationUrl,
-                "tokenUrl": tokenUrl,
-                "refreshUrl": refreshUrl,
-                "scopes": scopes,
-            }
+@app.route(
+    app_config.REDIRECT_PATH
+)  # Its absolute URL must match your app's redirect_uri set in AAD
+def authorized():
+    try:
+        cache = _load_cache()
+        result = _build_msal_app(cache=cache).acquire_token_by_auth_code_flow(
+            session.get("flow", {}), request.args
         )
-        super().__init__(
-            flows=flows,
-            scheme_name=scheme_name,
-            description=description,
-            auto_error=auto_error,
-        )
-
-    async def __call__(self, request: Request) -> Optional[str]:
-        authorization = request.cookies.get("Authorization")
-        # import sys
-
-        # print("ok")
-        # print(authorization, file=sys.stderr)
-        def _error():
-            if self.auto_error:
-                raise HTTPException(
-                    status_code=HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            else:
-                return None  # pragma: nocover
-
-        if not authorization:
-            return _error()
-        scheme, param = authorization.split(" ")
-        if scheme.lower() != "bearer":
-            return _error()
-        return param
+        if "error" in result:
+            return render_template("auth_error.html", result=result)
+        session["user"] = result.get("id_token_claims")
+        _save_cache(cache)
+    except ValueError:  # Usually caused by CSRF
+        pass  # Simply ignore them
+    return redirect(url_for("index"))
 
 
-azure_scheme.oauth = CookieBasedOAuth2TokenBearer(
-    authorizationUrl=azure_scheme.authorization_url,
-    tokenUrl=azure_scheme.token_url,
-    scopes=scopes,
-    scheme_name="AzureAuthorizationCodeBearerBase",
-    description="`Leave client_secret blank`",
-    auto_error=True,  # We catch this exception in __call__
-)
-azure_scheme.model = azure_scheme.oauth.model
-
-exporter = AzureExporter(connection_string=f"{settings.APPINSIGHTS_CONNECTION_STRING}")
-sampler = ProbabilitySampler(1.0)
-# fastapi middleware for opencensus
-@app.middleware("http")
-async def middleware_opencensus(request: Request, call_next):
-    tracer = Tracer(exporter=exporter, sampler=sampler)
-    with tracer.span("main") as span:
-        span.span_kind = SpanKind.SERVER
-
-        response = await call_next(request)
-
-        tracer.add_attribute_to_current_span(
-            attribute_key=settings.HTTP_STATUS_CODE,
-            attribute_value=response.status_code,
-        )
-        tracer.add_attribute_to_current_span(
-            attribute_key=settings.HTTP_URL, attribute_value=str(request.url)
-        )
-
-    return response
+@app.route("/logout")
+def logout():
+    session.clear()  # Wipe out user and its token cache from session
+    services.user_service.current_user = None
+    return redirect(  # Also logout from your tenant's web session
+        app_config.AUTHORITY
+        + "/oauth2/v2.0/logout"
+        + "?post_logout_redirect_uri="
+        + url_for("index", _external=True)
+    )
 
 
-def add_cors(app):
-    if settings.BACKEND_CORS_ORIGINS:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+@app.route("/graphcall")
+def graphcall():
+    token = _get_token_from_cache(app_config.SCOPE)
+    if not token:
+        return redirect(url_for("login"))
+    graph_data = requests.get(  # Use token to call downstream service
+        app_config.ENDPOINT,
+        headers={"Authorization": "Bearer " + token["access_token"]},
+    ).json()
+    return render_template("display.html", result=graph_data)
 
+@app.route("/vote/<applicant_id>")
+def vote(applicant_id):
+    services.user_service.load_current_user()
+    current_uer_id = services.user_service.current_user.ID
+    if request.args.get("vote_type") == "yes":
+        services.voting_service.vote_yes(applicant_id, current_uer_id)
+    if request.args.get("vote_type") == "no":
+        services.voting_service.vote_no(applicant_id, current_uer_id)
+    
+    return jsonify(success=True)
 
-@app.on_event("startup")
-async def load_config() -> None:
-    """
-    Load OpenID config on startup.
-    """
-    await azure_scheme.openid_config.load_config()
-
-
-# @app.route("/.auth/login/aad/callback")
-# def callback(request: Request):
-#     return RedirectResponse(url=f"{settings.SELF_URL}/")
-
-
-# @app.route("/login")
-# def login(request: Request):
-#     url = f"https://login.microsoftonline.com/{settings.TENANT_ID}/oauth2/v2.0/authorize?client_id={settings.CLIENT_ID}&scope={settings.SCOPE}"
-#     return RedirectResponse(url=url)
-
-
-# @app.route("/logout")
-# def logout(request: Request):
-#     url = f"{settings.AUTHORITY}/oauth2/v2.0/logout?post_logout_redirect_uri={settings.SELF_URL}"
-#     return RedirectResponse(url=url)
-
-
-@app.get("/home")
-async def root(request: Request, hx_request: Optional[str] = Header(None)):
-    applicants = [
-        {"name": "Andrzej", "surname": "Popatrz w góre"},
-        {"name": "Andrzej", "surname": azure_scheme.token_url},
-    ]
-    context = {"request": request, "applicants": applicants}
-    if hx_request:
-        return templates.TemplateResponse("applicants.html", context)
-
-    return templates.TemplateResponse("index.html", context)
-
-
-@app.get("/info", dependencies=[Security(azure_scheme)])
-# @app.get("/info")
-async def info(request: Request):
-    # azure_scheme.openid_config.authorization_endpoint
-    # request.state.
-    return {"user": request.state.user.dict()}
-    # return "Hello world!"
-
+app.jinja_env.globals.update(
+    _build_auth_code_flow=_build_auth_code_flow
+)  # Used in template
 
 if __name__ == "__main__":
-
-    uvicorn.run(
-        "main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        log_level=settings.LOG_LEVEL,
-        reload=True,
-    )
+    app.run(debug=True)

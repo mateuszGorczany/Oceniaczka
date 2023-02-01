@@ -1,52 +1,40 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oceniaczka</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.8.5" integrity="sha384-7aHh9lqPYGYZ7sTHvzP1t3BAfLhYSTy9ArHdP3Xsr9/3TlGurYgcPBoFmXX2TX/w" crossorigin="anonymous"></script>
-    <script type="text/javascript" src="https://alcdn.msauth.net/lib/1.1.3/js/msal.js"></script>
-    <script type="text/javascript" src="static/authConfig.js"></script>
-    <script type="text/javascript" src="static/authPopup.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
     <script>
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
+        function submitVote(applicant_id, vote_id) {
+            let selected_radio = document.querySelector(`input[name="${vote_id}"]:checked`).value;
+            fetch(`/vote/${applicant_id}?vote_type=${selected_radio}`)
         }
-        XMLHttpRequest.prototype.open = (function(open) {
-            return function(method,url,async) {
-                open.apply(this,arguments);
-                this.setRequestHeader('Authorization', getCookie("Authorization"));
-        };
-        })(XMLHttpRequest.prototype.open);
     </script>
 </head>
 <body>
     {% include 'navbar.html' %}
-    <div class="mx-4">
-        <p class="text-2xl font-bold mb-4">Lista kandydatów do oceny</p>
-        <table class="min-w-[50%] mb=4">
-            <thead class="border-b text-lg">
-                <tr>
-                    <th class="border">Imię</th>
-                    <th class="border">Nazwisko</th>
-                </tr>
-            </thead>
-            <tbody class="text-center text-sm" id="applicants-list">
-                {% include 'applicants.html' %}
-            </tbody>
-        </table>
-        <button
-            class="px-3 py-1 bg-blue-600 text-white ml-4"
-            hx-get="/"
-            hx-target="#applicants-list"
-            hx-swap="beforeend"
-        >
-            Załaduj więcej
-        </button>
+    <!-- <h3>Zalogowano jako {{ session.get("user") }}</h3> -->
+    <h1>Aplikanci</h1>
+    <table class="table">
+      <thead class="thead-dark">
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Imię</th>
+          <th scope="col">Nazwisko</th>
+          <th scope="col">Wydział</th>
+          <th scope="col">Wiek</th>
+          {% if session.get("user") %}
+          <th scope="col">Zagłosuj</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% include 'display_applicants.html' %}
+      </tbody>
+    </table>
+    {% if config.get("ENDPOINT") %}
+      <li><a href='/graphcall'>Call Microsoft Graph API</a></li>
+    {% endif %}
 
-    </div>
+    <footer style="text-align: right">Mateusz Górczany AD 2023</footer>
 </body>
 </html>
