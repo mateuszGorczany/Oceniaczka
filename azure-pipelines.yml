@@ -50,6 +50,7 @@ stages:
     - script: |
         pip install pytest pytest-azurepipelines
         pytest
+      workingDirectory: $(projectRoot)
       displayName: 'pytest'
 
     - task: ArchiveFiles@2
