@@ -46,11 +46,12 @@ stages:
         pip install -r requirements.txt
       workingDirectory: $(projectRoot)
       displayName: "Install requirements"
-    - task: Bash@3
-      inputs:
-        targetType: 'inline'
-        script: 'pytest .'
-      displayName: "Run tests"
+    
+    - script: |
+        pip install pytest pytest-azurepipelines
+        pytest
+      workingDirectory: $(projectRoot)
+      displayName: 'pytest'
 
     - task: ArchiveFiles@2
       displayName: 'Archive files'
