@@ -49,9 +49,12 @@ stages:
     
     - script: |
         pip install pytest pytest-azurepipelines
-        pytest
-      workingDirectory: $(projectRoot)
-      displayName: 'pytest'
+      displayName: 'Install pytest'
+
+    - script: |
+        python -m pytest --junitxml=$(Build.StagingDirectory)/Testoutput.xml
+      workingDirectory: 'tests'
+      displayName: 'Test with PyTest'
 
     - task: ArchiveFiles@2
       displayName: 'Archive files'
