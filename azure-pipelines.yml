@@ -43,15 +43,17 @@ stages:
         source antenv/bin/activate
         python -m pip install --upgrade pip
         pip install setup
-        pip install --target="./.python_packages/lib/site-packages" -r ./requirements.txt
+        pip install -r ./requirements.txt
       workingDirectory: $(projectRoot)
       displayName: "Install requirements"
     
     - script: |
+        source antenv/bin/activate
         pip install pytest pytest-azurepipelines
       displayName: 'Install pytest'
 
     - script: |
+        source antenv/bin/activate
         python -m pytest --junitxml=$(Build.StagingDirectory)/Testoutput.xml
       workingDirectory: 'tests'
       displayName: 'Test with PyTest'
