@@ -132,4 +132,4 @@ app.jinja_env.globals.update(
 )  # Used in template
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=app_config.PORT, debug=True, load_dotenv=True)
