@@ -37,5 +37,5 @@ def test_current_user(user_service):
         
 
 def test_list_applicants(applicant_service):
-    assert applicant_service.list_applicants() == [test_applicant]
+    assert applicant_service.list_applicants(with_votes=False) == [test_applicant]
         

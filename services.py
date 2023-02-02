@@ -87,15 +87,16 @@ class ApplicantsService:
         self.db_client: QueryExecutor = db_client
         self.voting_service = VotingService()
 
-    def list_applicants(self) -> List[Applicant]:
+    def list_applicants(self, with_votes=True) -> List[Applicant]:
         applicants_raw = self.db_client.query_items(
             query="SELECT c.id, c.name, c.surname, c.age, c.faculty FROM c",
             enable_cross_partition_query=True
         )
 
         applicants = parse_obj_as(List[Applicant], list(applicants_raw))
-        for i in range(len(applicants)):
-            applicants[i].Votes = self.voting_service.votes_for_applicant(applicants[i].ID)
+        if with_votes:
+            for i in range(len(applicants)):
+                applicants[i].Votes = self.voting_service.votes_for_applicant(applicants[i].ID)
            
 
         return applicants
@@ -113,7 +114,7 @@ class ApplicantsService:
 class VotingService:
 
     def __init__(self) -> None:
-        self.voting_service_url = app_config.VOTING_SERVICE_URL
+        self.voting_service_url = app_config.VOTING_SERVICE_URL if app_config.VOTING_SERVICE_URL != "" else ""
 
     def vote(self, voted_applicant_id: UUID, voting_user_id: UserID, vote_type):
         if vote_type == "yes":
