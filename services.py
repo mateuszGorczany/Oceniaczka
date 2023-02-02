@@ -115,6 +115,7 @@ class VotingService:
 
     def __init__(self) -> None:
         self.voting_service_url = app_config.VOTING_SERVICE_URL if app_config.VOTING_SERVICE_URL != "" else ""
+        self.params = {"code":"AsctDp76LgeAjZO8dfk-bx26rfb-7LN-nJ-SSuFplkhXAzFu0oRRUQ=="}
 
     def vote(self, voted_applicant_id: UUID, voting_user_id: UserID, vote_type):
         if vote_type == "yes":
@@ -123,11 +124,11 @@ class VotingService:
             reqs.post(f"{self.voting_service_url}/votes/applicants/{voted_applicant_id}?user_id={voting_user_id}&vote_type=no").json()
 
     def votes_for_applicant(self, applicant_id: UUID) -> int:
-        resp = reqs.get(f"{self.voting_service_url}/votes/applicants/{applicant_id}").json()
+        resp = reqs.get(f"{self.voting_service_url}/votes/applicants/{applicant_id}", params=self.params).json()
         return len(resp)
 
     def votes_of_user(self, user_id: UserID) -> int:
-        resp = reqs.get(f"{self.voting_service_url}/votes/users/{user_id}").json()
+        resp = reqs.get(f"{self.voting_service_url}/votes/users/{user_id}", params=self.params).json()
         return len(resp)
     
     def has_user_voted_for(self, user_id, applicant_id):

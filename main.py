@@ -63,7 +63,7 @@ def index():
     return render_template(
         "index.html", 
         user=user, 
-        applicants=services.applicants_service.list_applicants(),
+        applicants=services.applicants_service.list_applicants(with_votes=False),
         version=msal.__version__
     )
 
