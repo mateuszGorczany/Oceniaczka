@@ -83,7 +83,7 @@ class UserSerivce:
 class ApplicantsService:
     
     def __init__(self, db_client: QueryExecutor) -> None:
-        self.db_client: QueryExecutor = db_client()
+        self.db_client: QueryExecutor = db_client
 
     def list_applicants(self) -> List[Applicant]:
         applicants_raw = self.db_client.query_items(

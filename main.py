@@ -29,7 +29,7 @@ class Services:
         self.db_client = db_client()
         self.user_service = svcs.UserSerivce()
         self.voting_service = svcs.VotingService()
-        self.applicants_service = svcs.ApplicantsService(db_client)
+        self.applicants_service = svcs.ApplicantsService(db_client())
 
 def set_up_app():
     app = Flask(__name__)
