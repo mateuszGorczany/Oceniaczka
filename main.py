@@ -121,9 +121,9 @@ def vote(applicant_id):
     services.user_service.load_current_user()
     current_uer_id = services.user_service.current_user.ID
     if request.args.get("vote_type") == "yes":
-        services.voting_service.vote_yes(applicant_id, current_uer_id)
+        services.voting_service.vote(applicant_id, current_uer_id, vote_type="yes")
     if request.args.get("vote_type") == "no":
-        services.voting_service.vote_no(applicant_id, current_uer_id)
+        services.voting_service.vote(applicant_id, current_uer_id, vote_type="no")
     
     return jsonify(success=True)
 

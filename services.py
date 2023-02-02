@@ -2,13 +2,15 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
-from uuid import UUID, uuid4
+from uuid import UUID
 from flask import session
 from auth import _get_token_from_cache
 import app_config
 import requests
 from pydantic import parse_obj_as
 from abc import ABC, abstractmethod
+import requests as reqs
+# %%
 
 class QueryExecutor(ABC):
 
@@ -33,6 +35,7 @@ class QueryExecutor(ABC):
 class UserID(str):
     pass
 
+# %%
 class Faculty(str, Enum):
     WFiIS="Wydział Fizyki i Informatyki Stosowanej"
     WiEIT="Wydział Elektroniki i Telekomunikacji"
@@ -44,15 +47,14 @@ class Applicant(BaseModel):
     Surname: str = Field(alias="surname")
     Age: int = Field(alias="age")
     Faculty: str = Field(alias="faculty")
+    Votes: Optional[int]
+
 # %%
 class User(BaseModel):
     ID: UserID = Field(alias="id")
     Surname: str = Field(alias="surname")
     DisplayName: str = Field(alias="displayName")
 
-applicants_db: List[Applicant] = [
-    Applicant(id= uuid4(),name="Mateusz", surname="Górczany", age=23, faculty=Faculty.WFiIS)
-]
 
 class UserSerivce:
     def __init__(self) -> None:
@@ -79,18 +81,24 @@ class UserSerivce:
 
 
 # %%
-
 class ApplicantsService:
     
     def __init__(self, db_client: QueryExecutor) -> None:
         self.db_client: QueryExecutor = db_client
+        self.voting_service = VotingService()
 
     def list_applicants(self) -> List[Applicant]:
         applicants_raw = self.db_client.query_items(
             query="SELECT c.id, c.name, c.surname, c.age, c.faculty FROM c",
             enable_cross_partition_query=True
         )
-        return parse_obj_as(List[Applicant], list(applicants_raw))
+
+        applicants = parse_obj_as(List[Applicant], list(applicants_raw))
+        for i in range(len(applicants)):
+            applicants[i].Votes = self.voting_service.votes_for_applicant(applicants[i].ID)
+           
+
+        return applicants
 
     def get_applicant_by_id(self, uuid: UUID) -> Optional[Applicant]:
         applicant_raw = list(self.db_client.query_items(
@@ -101,22 +109,27 @@ class ApplicantsService:
             return None
         return Applicant(**applicant_raw[0])
 # %%
+# %%
 class VotingService:
 
     def __init__(self) -> None:
-        pass
+        self.voting_service_url = app_config.VOTING_SERVICE_URL
 
-    @staticmethod
-    def vote_yes(voted_applicant_id: UUID, voting_user_id: UserID):
-        pass
-        # if votes_db_yes.get(voted_applicant_id) is None:
-        #     votes_db_yes[voted_applicant_id] = []
-        # votes_db_yes[voted_applicant_id].append(voting_user_id)
+    def vote(self, voted_applicant_id: UUID, voting_user_id: UserID, vote_type):
+        if vote_type == "yes":
+            reqs.post(f"{self.voting_service_url}/votes/applicants/{voted_applicant_id}?user_id={voting_user_id}&vote_type=yes").json()
+        if vote_type == "no":
+            reqs.post(f"{self.voting_service_url}/votes/applicants/{voted_applicant_id}?user_id={voting_user_id}&vote_type=no").json()
 
-    @staticmethod
-    def vote_no(voted_applicant_id: UUID, voting_user_id: UserID):
-        pass
-        # if votes_db_no.get(voted_applicant_id) is None:
-        #     votes_db_no[voted_applicant_id] = []
-        # votes_db_no[voted_applicant_id].append(voting_user_id)
+    def votes_for_applicant(self, applicant_id: UUID) -> int:
+        resp = reqs.get(f"{self.voting_service_url}/votes/applicants/{applicant_id}").json()
+        return len(resp)
+
+    def votes_of_user(self, user_id: UserID) -> int:
+        resp = reqs.get(f"{self.voting_service_url}/votes/users/{user_id}").json()
+        return len(resp)
+    
+    def has_user_voted_for(self, user_id, applicant_id):
+        reqs.get(f"{self.voting_service_url}/votes/users/{user_id}").json()
+
 # %%

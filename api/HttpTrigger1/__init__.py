@@ -8,7 +8,7 @@ from config.config import settings
 
 
 app = FastAPI()
-app.include_router(endpoints.router, prefix="/people")
+app.include_router(endpoints.router)
 
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -18,14 +18,6 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=['*'],
         allow_headers=['*'],
     )
-
-
-@app.on_event('startup')
-async def load_config() -> None:
-    """
-    Load OpenID config on startup.
-    """
-    await endpoints.azure_scheme.openid_config.load_config()
 
 
 
